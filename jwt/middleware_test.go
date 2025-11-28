@@ -353,7 +353,7 @@ func TestHTTPMiddleware_RequireScope_Success(t *testing.T) {
 
 	claims := newValidClaims(userID, tenantID, ScopeUserRead, ScopeUserUpdate)
 	validator := newMockValidator(claims)
-	jwtMiddleware := NewHTTPMiddleware(validator)                           // Create middleware instance once
+	jwtMiddleware := NewHTTPMiddleware(validator)                       // Create middleware instance once
 	handler := jwtMiddleware.RequireScope(ScopeUserRead)(testHandler()) // Use it for multiple endpoints
 
 	rec := testRequest(handler, "Bearer valid-token")

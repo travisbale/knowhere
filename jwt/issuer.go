@@ -20,9 +20,9 @@ const (
 // Claims represents the JWT claims structure
 type Claims struct {
 	jwt.RegisteredClaims
-	UserID   uuid.UUID   `json:"user_id"`
-	TenantID uuid.UUID   `json:"tenant_id"`
-	Scopes   []Scope `json:"scopes,omitempty"`
+	UserID   uuid.UUID `json:"user_id"`
+	TenantID uuid.UUID `json:"tenant_id"`
+	Scopes   []Scope   `json:"scopes,omitempty"`
 }
 
 // Issuer handles JWT token generation
