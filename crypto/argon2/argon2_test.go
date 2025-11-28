@@ -122,9 +122,12 @@ func TestVerifyPassword_Success(t *testing.T) {
 		t.Fatalf("failed to hash password: %v", err)
 	}
 
-	err = hasher.VerifyPassword(password, hash)
+	match, err := hasher.VerifyPassword(password, hash)
 	if err != nil {
-		t.Errorf("expected password verification to succeed, got %v", err)
+		t.Errorf("expected no error, got %v", err)
+	}
+	if !match {
+		t.Error("expected password verification to succeed")
 	}
 }
 
@@ -137,9 +140,12 @@ func TestVerifyPassword_WrongPassword(t *testing.T) {
 		t.Fatalf("failed to hash password: %v", err)
 	}
 
-	err = hasher.VerifyPassword("wrongPassword", hash)
-	if err != ErrPasswordMismatch {
-		t.Errorf("expected ErrPasswordMismatch, got %v", err)
+	match, err := hasher.VerifyPassword("wrongPassword", hash)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if match {
+		t.Error("expected password verification to fail")
 	}
 }
 
@@ -153,15 +159,21 @@ func TestVerifyPassword_EmptyPassword(t *testing.T) {
 	}
 
 	// Verify with empty password
-	err = hasher.VerifyPassword("", hash)
+	match, err := hasher.VerifyPassword("", hash)
 	if err != nil {
-		t.Errorf("expected verification to succeed for empty password, got %v", err)
+		t.Errorf("expected no error, got %v", err)
+	}
+	if !match {
+		t.Error("expected verification to succeed for empty password")
 	}
 
 	// Verify with non-empty password should fail
-	err = hasher.VerifyPassword("notEmpty", hash)
-	if err != ErrPasswordMismatch {
-		t.Errorf("expected ErrInvalidCredentials, got %v", err)
+	match, err = hasher.VerifyPassword("notEmpty", hash)
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+	if match {
+		t.Error("expected verification to fail for non-empty password")
 	}
 }
 
@@ -181,7 +193,7 @@ func TestVerifyPassword_InvalidHashFormat(t *testing.T) {
 	}
 
 	for _, hash := range invalidHashes {
-		err := hasher.VerifyPassword("password", hash)
+		_, err := hasher.VerifyPassword("password", hash)
 		if err == nil {
 			t.Errorf("expected error for invalid hash: %s", hash)
 		}
@@ -210,14 +222,20 @@ func TestRoundTrip_MultiplePasswords(t *testing.T) {
 		}
 
 		// Verify correct password
-		err = hasher.VerifyPassword(password, hash)
+		match, err := hasher.VerifyPassword(password, hash)
 		if err != nil {
-			t.Errorf("password %q: verification failed: %v", password, err)
+			t.Errorf("password %q: unexpected error: %v", password, err)
+		}
+		if !match {
+			t.Errorf("password %q: verification failed", password)
 		}
 
 		// Verify wrong password fails
-		err = hasher.VerifyPassword(password+"wrong", hash)
-		if err != ErrPasswordMismatch {
+		match, err = hasher.VerifyPassword(password+"wrong", hash)
+		if err != nil {
+			t.Errorf("password %q: unexpected error: %v", password, err)
+		}
+		if match {
 			t.Errorf("password %q: expected verification to fail with wrong password", password)
 		}
 	}
@@ -233,19 +251,22 @@ func TestRoundTrip_CaseSensitivity(t *testing.T) {
 	}
 
 	// Correct case should work
-	err = hasher.VerifyPassword("Password123", hash)
+	match, err := hasher.VerifyPassword("Password123", hash)
 	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !match {
 		t.Error("expected verification to succeed with correct case")
 	}
 
 	// Wrong case should fail
-	err = hasher.VerifyPassword("password123", hash)
-	if err != ErrPasswordMismatch {
+	match, _ = hasher.VerifyPassword("password123", hash)
+	if match {
 		t.Error("expected verification to fail with different case")
 	}
 
-	err = hasher.VerifyPassword("PASSWORD123", hash)
-	if err != ErrPasswordMismatch {
+	match, _ = hasher.VerifyPassword("PASSWORD123", hash)
+	if match {
 		t.Error("expected verification to fail with different case")
 	}
 }
@@ -260,14 +281,14 @@ func TestRoundTrip_WhitespaceMatters(t *testing.T) {
 	}
 
 	// Trailing space should fail
-	err = hasher.VerifyPassword("password ", hash)
-	if err != ErrPasswordMismatch {
+	match, _ := hasher.VerifyPassword("password ", hash)
+	if match {
 		t.Error("expected verification to fail with trailing space")
 	}
 
 	// Leading space should fail
-	err = hasher.VerifyPassword(" password", hash)
-	if err != ErrPasswordMismatch {
+	match, _ = hasher.VerifyPassword(" password", hash)
+	if match {
 		t.Error("expected verification to fail with leading space")
 	}
 }
@@ -298,9 +319,12 @@ func TestHasher_DifferentConfigurations(t *testing.T) {
 		}
 
 		// Verify works with same hasher
-		err = hasher.VerifyPassword(password, hash)
+		match, err := hasher.VerifyPassword(password, hash)
 		if err != nil {
-			t.Errorf("config %d: verification failed: %v", i, err)
+			t.Errorf("config %d: unexpected error: %v", i, err)
+		}
+		if !match {
+			t.Errorf("config %d: verification failed", i)
 		}
 	}
 }
@@ -331,8 +355,11 @@ func TestHasher_CrossConfigurationVerification(t *testing.T) {
 		Parallelism: 8,
 	})
 
-	err = hasher2.VerifyPassword(password, hash)
+	match, err := hasher2.VerifyPassword(password, hash)
 	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !match {
 		t.Error("verification should work with different hasher config (params in hash)")
 	}
 }
@@ -359,8 +386,11 @@ func TestHasher_ConstantTimeComparison(t *testing.T) {
 	}
 
 	for _, similar := range similarPasswords {
-		err := hasher.VerifyPassword(similar, hash)
-		if err != ErrPasswordMismatch {
+		match, err := hasher.VerifyPassword(similar, hash)
+		if err != nil {
+			t.Errorf("unexpected error for password %q: %v", similar, err)
+		}
+		if match {
 			t.Errorf("expected verification to fail for similar password: %s", similar)
 		}
 	}

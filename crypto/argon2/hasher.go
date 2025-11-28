@@ -31,6 +31,6 @@ func (h *Hasher) HashPassword(password string) (string, error) {
 	return hashPassword(h.memory, h.iterations, h.saltLength, h.keyLength, h.parallelism, password)
 }
 
-func (*Hasher) VerifyPassword(password string, encodedHash string) error {
+func (*Hasher) VerifyPassword(password string, encodedHash string) (bool, error) {
 	return compareHashAndPassword(password, encodedHash)
 }

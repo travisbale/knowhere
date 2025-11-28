@@ -4,15 +4,11 @@ import (
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"strings"
 
 	"golang.org/x/crypto/argon2"
 )
-
-// ErrPasswordMismatch is returned when the provided password does not match the hash
-var ErrPasswordMismatch = errors.New("password does not match")
 
 // hashPassword generates an Argon2id hash of the password
 func hashPassword(memory, iterations, saltLength, keyLength uint32, parallelism uint8, password string) (string, error) {
@@ -35,47 +31,43 @@ func hashPassword(memory, iterations, saltLength, keyLength uint32, parallelism 
 }
 
 // compareHashAndPassword verifies that the provided password matches the hash
-func compareHashAndPassword(password, encodedHash string) error {
+func compareHashAndPassword(password, encodedHash string) (bool, error) {
 	// Extracts parameters from encoded hash to ensure verification uses same settings as hashing
 	parts := strings.Split(encodedHash, "$")
 	if len(parts) != 6 {
-		return fmt.Errorf("invalid hash format")
+		return false, fmt.Errorf("invalid hash format")
 	}
 
 	if parts[1] != "argon2id" {
-		return fmt.Errorf("unsupported algorithm: %s", parts[1])
+		return false, fmt.Errorf("unsupported algorithm: %s", parts[1])
 	}
 
 	var version int
 	if _, err := fmt.Sscanf(parts[2], "v=%d", &version); err != nil {
-		return fmt.Errorf("failed to parse version: %w", err)
+		return false, fmt.Errorf("failed to parse version: %w", err)
 	}
 	if version != argon2.Version {
-		return fmt.Errorf("unsupported version: %d", version)
+		return false, fmt.Errorf("unsupported version: %d", version)
 	}
 
 	var memory, time uint32
 	var threads uint8
 	if _, err := fmt.Sscanf(parts[3], "m=%d,t=%d,p=%d", &memory, &time, &threads); err != nil {
-		return fmt.Errorf("failed to parse parameters: %w", err)
+		return false, fmt.Errorf("failed to parse parameters: %w", err)
 	}
 
 	salt, err := base64.RawStdEncoding.DecodeString(parts[4])
 	if err != nil {
-		return fmt.Errorf("failed to decode salt: %w", err)
+		return false, fmt.Errorf("failed to decode salt: %w", err)
 	}
 
 	hash, err := base64.RawStdEncoding.DecodeString(parts[5])
 	if err != nil {
-		return fmt.Errorf("failed to decode hash: %w", err)
+		return false, fmt.Errorf("failed to decode hash: %w", err)
 	}
 
 	comparisonHash := argon2.IDKey([]byte(password), salt, time, memory, threads, uint32(len(hash)))
 
 	// Constant-time comparison prevents timing attacks that could reveal password similarity
-	if subtle.ConstantTimeCompare(hash, comparisonHash) == 1 {
-		return nil
-	}
-
-	return ErrPasswordMismatch
+	return subtle.ConstantTimeCompare(hash, comparisonHash) == 1, nil
 }
