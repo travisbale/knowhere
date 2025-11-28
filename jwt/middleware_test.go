@@ -10,6 +10,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// Test scopes for testing
+const (
+	ScopeUserRead   Scope = "user:read"
+	ScopeUserUpdate Scope = "user:update"
+)
+
 // Mock validator for HTTP middleware tests
 type mockValidator struct {
 	claims *Claims
