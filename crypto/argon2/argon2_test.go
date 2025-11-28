@@ -1,6 +1,7 @@
 package argon2
 
 import (
+	"errors"
 	"strings"
 	"testing"
 )
@@ -15,228 +16,210 @@ func createTestHasher() *Hasher {
 	})
 }
 
-// HashPassword Tests
+// Hash Tests
 
-func TestHashPassword_Success(t *testing.T) {
+func TestHash_Success(t *testing.T) {
 	hasher := createTestHasher()
 
-	password := "mySecurePassword123!"
-	hash, err := hasher.HashPassword(password)
+	input := "mySecurePassword123!"
+	h, err := hasher.Hash(input)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if hash == "" {
+	if h == "" {
 		t.Error("expected non-empty hash")
 	}
 
 	// Verify hash format: $argon2id$v=19$m=X,t=Y,p=Z$salt$hash
-	if !strings.HasPrefix(hash, "$argon2id$") {
-		t.Errorf("expected hash to start with $argon2id$, got %s", hash)
+	if !strings.HasPrefix(h, "$argon2id$") {
+		t.Errorf("expected hash to start with $argon2id$, got %s", h)
 	}
 
-	parts := strings.Split(hash, "$")
+	parts := strings.Split(h, "$")
 	if len(parts) != 6 {
 		t.Errorf("expected 6 parts in hash, got %d", len(parts))
 	}
 }
 
-func TestHashPassword_DifferentSalts(t *testing.T) {
+func TestHash_DifferentSalts(t *testing.T) {
 	hasher := createTestHasher()
 
-	password := "samePassword"
+	input := "sameInput"
 
-	hash1, err := hasher.HashPassword(password)
+	hash1, err := hasher.Hash(input)
 	if err != nil {
-		t.Fatalf("failed to hash password (1): %v", err)
+		t.Fatalf("failed to hash (1): %v", err)
 	}
 
-	hash2, err := hasher.HashPassword(password)
+	hash2, err := hasher.Hash(input)
 	if err != nil {
-		t.Fatalf("failed to hash password (2): %v", err)
+		t.Fatalf("failed to hash (2): %v", err)
 	}
 
-	// Same password should produce different hashes due to different salts
+	// Same input should produce different hashes due to different salts
 	if hash1 == hash2 {
-		t.Error("expected different hashes for same password (different salts)")
+		t.Error("expected different hashes for same input (different salts)")
 	}
 }
 
-func TestHashPassword_EmptyPassword(t *testing.T) {
+func TestHash_EmptyInput(t *testing.T) {
 	hasher := createTestHasher()
 
-	hash, err := hasher.HashPassword("")
+	h, err := hasher.Hash("")
 	if err != nil {
-		t.Fatalf("expected no error for empty password, got %v", err)
+		t.Fatalf("expected no error for empty input, got %v", err)
 	}
 
-	if hash == "" {
-		t.Error("expected non-empty hash even for empty password")
+	if h == "" {
+		t.Error("expected non-empty hash even for empty input")
 	}
 }
 
-func TestHashPassword_LongPassword(t *testing.T) {
+func TestHash_LongInput(t *testing.T) {
 	hasher := createTestHasher()
 
-	// Test with a very long password
-	longPassword := strings.Repeat("a", 1000)
-	hash, err := hasher.HashPassword(longPassword)
+	// Test with a very long input
+	longInput := strings.Repeat("a", 1000)
+	h, err := hasher.Hash(longInput)
 	if err != nil {
-		t.Fatalf("expected no error for long password, got %v", err)
+		t.Fatalf("expected no error for long input, got %v", err)
 	}
 
-	if hash == "" {
+	if h == "" {
 		t.Error("expected non-empty hash")
 	}
 }
 
-func TestHashPassword_SpecialCharacters(t *testing.T) {
+func TestHash_SpecialCharacters(t *testing.T) {
 	hasher := createTestHasher()
 
-	passwords := []string{
+	inputs := []string{
 		"pass!@#$%^&*()",
 		"pāsswørd",
 		"密码",
 		"🔐secure🔑",
 	}
 
-	for _, password := range passwords {
-		hash, err := hasher.HashPassword(password)
+	for _, input := range inputs {
+		h, err := hasher.Hash(input)
 		if err != nil {
-			t.Errorf("password %q: unexpected error: %v", password, err)
+			t.Errorf("input %q: unexpected error: %v", input, err)
 		}
-		if hash == "" {
-			t.Errorf("password %q: expected non-empty hash", password)
+		if h == "" {
+			t.Errorf("input %q: expected non-empty hash", input)
 		}
 	}
 }
 
-// VerifyPassword Tests
+// Verify Tests
 
-func TestVerifyPassword_Success(t *testing.T) {
+func TestVerify_Success(t *testing.T) {
 	hasher := createTestHasher()
 
-	password := "correctPassword"
-	hash, err := hasher.HashPassword(password)
+	input := "correctInput"
+	h, err := hasher.Hash(input)
 	if err != nil {
-		t.Fatalf("failed to hash password: %v", err)
+		t.Fatalf("failed to hash: %v", err)
 	}
 
-	match, err := hasher.VerifyPassword(password, hash)
+	err = hasher.Verify(input, h)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
-	}
-	if !match {
-		t.Error("expected password verification to succeed")
 	}
 }
 
-func TestVerifyPassword_WrongPassword(t *testing.T) {
+func TestVerify_WrongInput(t *testing.T) {
 	hasher := createTestHasher()
 
-	password := "correctPassword"
-	hash, err := hasher.HashPassword(password)
+	input := "correctInput"
+	h, err := hasher.Hash(input)
 	if err != nil {
-		t.Fatalf("failed to hash password: %v", err)
+		t.Fatalf("failed to hash: %v", err)
 	}
 
-	match, err := hasher.VerifyPassword("wrongPassword", hash)
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-	if match {
-		t.Error("expected password verification to fail")
+	err = hasher.Verify("wrongInput", h)
+	if !errors.Is(err, ErrMismatchedHash) {
+		t.Errorf("expected ErrMismatchedHash, got %v", err)
 	}
 }
 
-func TestVerifyPassword_EmptyPassword(t *testing.T) {
+func TestVerify_EmptyInput(t *testing.T) {
 	hasher := createTestHasher()
 
-	// Hash empty password
-	hash, err := hasher.HashPassword("")
+	// Hash empty input
+	h, err := hasher.Hash("")
 	if err != nil {
-		t.Fatalf("failed to hash empty password: %v", err)
+		t.Fatalf("failed to hash empty input: %v", err)
 	}
 
-	// Verify with empty password
-	match, err := hasher.VerifyPassword("", hash)
+	// Verify with empty input
+	err = hasher.Verify("", h)
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-	if !match {
-		t.Error("expected verification to succeed for empty password")
-	}
 
-	// Verify with non-empty password should fail
-	match, err = hasher.VerifyPassword("notEmpty", hash)
-	if err != nil {
-		t.Errorf("expected no error, got %v", err)
-	}
-	if match {
-		t.Error("expected verification to fail for non-empty password")
+	// Verify with non-empty input should fail
+	err = hasher.Verify("notEmpty", h)
+	if !errors.Is(err, ErrMismatchedHash) {
+		t.Errorf("expected ErrMismatchedHash, got %v", err)
 	}
 }
 
-func TestVerifyPassword_InvalidHashFormat(t *testing.T) {
+func TestVerify_InvalidHashFormat(t *testing.T) {
 	hasher := createTestHasher()
 
 	invalidHashes := []string{
 		"",
 		"notahash",
 		"$invalid$format",
-		"$argon2id$v=19$m=65536",                // Too few parts
-		"$wrong$v=19$m=65536,t=1,p=4$salt$hash", // Wrong algorithm
+		"$argon2id$v=19$m=65536",                   // Too few parts
+		"$wrong$v=19$m=65536,t=1,p=4$salt$hash",    // Wrong algorithm
 		"$argon2id$v=99$m=65536,t=1,p=4$salt$hash", // Wrong version
 		"$argon2id$v=19$invalid$salt$hash",         // Invalid parameters
 		"$argon2id$v=19$m=65536,t=1,p=4$!!!$hash",  // Invalid base64 salt
 		"$argon2id$v=19$m=65536,t=1,p=4$salt$!!!",  // Invalid base64 hash
 	}
 
-	for _, hash := range invalidHashes {
-		_, err := hasher.VerifyPassword("password", hash)
+	for _, h := range invalidHashes {
+		err := hasher.Verify("input", h)
 		if err == nil {
-			t.Errorf("expected error for invalid hash: %s", hash)
+			t.Errorf("expected error for invalid hash: %s", h)
 		}
 	}
 }
 
 // Round-trip Tests
 
-func TestRoundTrip_MultiplePasswords(t *testing.T) {
+func TestRoundTrip_MultipleInputs(t *testing.T) {
 	hasher := createTestHasher()
 
-	passwords := []string{
+	inputs := []string{
 		"simple",
 		"Complex123!",
 		"",
-		"very long password with many words and characters 1234567890",
+		"very long input with many words and characters 1234567890",
 		"pāsswørd",
 		"密码",
 	}
 
-	for _, password := range passwords {
-		hash, err := hasher.HashPassword(password)
+	for _, input := range inputs {
+		h, err := hasher.Hash(input)
 		if err != nil {
-			t.Errorf("password %q: failed to hash: %v", password, err)
+			t.Errorf("input %q: failed to hash: %v", input, err)
 			continue
 		}
 
-		// Verify correct password
-		match, err := hasher.VerifyPassword(password, hash)
+		// Verify correct input
+		err = hasher.Verify(input, h)
 		if err != nil {
-			t.Errorf("password %q: unexpected error: %v", password, err)
-		}
-		if !match {
-			t.Errorf("password %q: verification failed", password)
+			t.Errorf("input %q: verification failed: %v", input, err)
 		}
 
-		// Verify wrong password fails
-		match, err = hasher.VerifyPassword(password+"wrong", hash)
-		if err != nil {
-			t.Errorf("password %q: unexpected error: %v", password, err)
-		}
-		if match {
-			t.Errorf("password %q: expected verification to fail with wrong password", password)
+		// Verify wrong input fails
+		err = hasher.Verify(input+"wrong", h)
+		if !errors.Is(err, ErrMismatchedHash) {
+			t.Errorf("input %q: expected ErrMismatchedHash, got %v", input, err)
 		}
 	}
 }
@@ -244,29 +227,26 @@ func TestRoundTrip_MultiplePasswords(t *testing.T) {
 func TestRoundTrip_CaseSensitivity(t *testing.T) {
 	hasher := createTestHasher()
 
-	password := "Password123"
-	hash, err := hasher.HashPassword(password)
+	input := "Input123"
+	h, err := hasher.Hash(input)
 	if err != nil {
-		t.Fatalf("failed to hash password: %v", err)
+		t.Fatalf("failed to hash: %v", err)
 	}
 
 	// Correct case should work
-	match, err := hasher.VerifyPassword("Password123", hash)
+	err = hasher.Verify("Input123", h)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !match {
-		t.Error("expected verification to succeed with correct case")
+		t.Errorf("expected verification to succeed with correct case, got %v", err)
 	}
 
 	// Wrong case should fail
-	match, _ = hasher.VerifyPassword("password123", hash)
-	if match {
+	err = hasher.Verify("input123", h)
+	if !errors.Is(err, ErrMismatchedHash) {
 		t.Error("expected verification to fail with different case")
 	}
 
-	match, _ = hasher.VerifyPassword("PASSWORD123", hash)
-	if match {
+	err = hasher.Verify("INPUT123", h)
+	if !errors.Is(err, ErrMismatchedHash) {
 		t.Error("expected verification to fail with different case")
 	}
 }
@@ -274,21 +254,21 @@ func TestRoundTrip_CaseSensitivity(t *testing.T) {
 func TestRoundTrip_WhitespaceMatters(t *testing.T) {
 	hasher := createTestHasher()
 
-	password := "password"
-	hash, err := hasher.HashPassword(password)
+	input := "input"
+	h, err := hasher.Hash(input)
 	if err != nil {
-		t.Fatalf("failed to hash password: %v", err)
+		t.Fatalf("failed to hash: %v", err)
 	}
 
 	// Trailing space should fail
-	match, _ := hasher.VerifyPassword("password ", hash)
-	if match {
+	err = hasher.Verify("input ", h)
+	if !errors.Is(err, ErrMismatchedHash) {
 		t.Error("expected verification to fail with trailing space")
 	}
 
 	// Leading space should fail
-	match, _ = hasher.VerifyPassword(" password", hash)
-	if match {
+	err = hasher.Verify(" input", h)
+	if !errors.Is(err, ErrMismatchedHash) {
 		t.Error("expected verification to fail with leading space")
 	}
 }
@@ -302,29 +282,26 @@ func TestHasher_DifferentConfigurations(t *testing.T) {
 		{Memory: 256 * 1024, Iterations: 2, SaltLength: 32, KeyLength: 64, Parallelism: 8},
 	}
 
-	password := "testPassword"
+	input := "testInput"
 
 	for i, config := range configs {
 		hasher := NewHasher(config)
 
-		hash, err := hasher.HashPassword(password)
+		h, err := hasher.Hash(input)
 		if err != nil {
 			t.Errorf("config %d: failed to hash: %v", i, err)
 			continue
 		}
 
 		// Hash should contain the configuration parameters
-		if !strings.Contains(hash, "$m=") {
+		if !strings.Contains(h, "$m=") {
 			t.Errorf("config %d: hash missing memory parameter", i)
 		}
 
 		// Verify works with same hasher
-		match, err := hasher.VerifyPassword(password, hash)
+		err = hasher.Verify(input, h)
 		if err != nil {
-			t.Errorf("config %d: unexpected error: %v", i, err)
-		}
-		if !match {
-			t.Errorf("config %d: verification failed", i)
+			t.Errorf("config %d: verification failed: %v", i, err)
 		}
 	}
 }
@@ -339,10 +316,10 @@ func TestHasher_CrossConfigurationVerification(t *testing.T) {
 		Parallelism: 4,
 	})
 
-	password := "testPassword"
-	hash, err := hasher1.HashPassword(password)
+	input := "testInput"
+	h, err := hasher1.Hash(input)
 	if err != nil {
-		t.Fatalf("failed to hash password: %v", err)
+		t.Fatalf("failed to hash: %v", err)
 	}
 
 	// Verify with different configuration hasher
@@ -355,12 +332,9 @@ func TestHasher_CrossConfigurationVerification(t *testing.T) {
 		Parallelism: 8,
 	})
 
-	match, err := hasher2.VerifyPassword(password, hash)
+	err = hasher2.Verify(input, h)
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !match {
-		t.Error("verification should work with different hasher config (params in hash)")
+		t.Errorf("verification should work with different hasher config (params in hash), got %v", err)
 	}
 }
 
@@ -371,27 +345,24 @@ func TestHasher_ConstantTimeComparison(t *testing.T) {
 	// but we can ensure the comparison works correctly
 	hasher := createTestHasher()
 
-	password := "password"
-	hash, err := hasher.HashPassword(password)
+	input := "input"
+	h, err := hasher.Hash(input)
 	if err != nil {
-		t.Fatalf("failed to hash password: %v", err)
+		t.Fatalf("failed to hash: %v", err)
 	}
 
-	// Verify that similar but wrong passwords still fail
-	similarPasswords := []string{
-		"passwor",   // One char short
-		"password1", // One char extra
-		"Password",  // Different case
-		"passworD",  // Last char different
+	// Verify that similar but wrong inputs still fail
+	similarInputs := []string{
+		"inpu",   // One char short
+		"input1", // One char extra
+		"Input",  // Different case
+		"inpuT",  // Last char different
 	}
 
-	for _, similar := range similarPasswords {
-		match, err := hasher.VerifyPassword(similar, hash)
-		if err != nil {
-			t.Errorf("unexpected error for password %q: %v", similar, err)
-		}
-		if match {
-			t.Errorf("expected verification to fail for similar password: %s", similar)
+	for _, similar := range similarInputs {
+		err := hasher.Verify(similar, h)
+		if !errors.Is(err, ErrMismatchedHash) {
+			t.Errorf("expected ErrMismatchedHash for similar input %q, got %v", similar, err)
 		}
 	}
 }

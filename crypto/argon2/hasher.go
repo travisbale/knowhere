@@ -27,10 +27,10 @@ func NewHasher(config *Config) *Hasher {
 	}
 }
 
-func (h *Hasher) HashPassword(password string) (string, error) {
-	return hashPassword(h.memory, h.iterations, h.saltLength, h.keyLength, h.parallelism, password)
+func (h *Hasher) Hash(input string) (string, error) {
+	return hash(h.memory, h.iterations, h.saltLength, h.keyLength, h.parallelism, input)
 }
 
-func (*Hasher) VerifyPassword(password string, encodedHash string) (bool, error) {
-	return compareHashAndPassword(password, encodedHash)
+func (*Hasher) Verify(input, encodedHash string) error {
+	return Verify(input, encodedHash)
 }
