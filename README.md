@@ -122,6 +122,60 @@ validator := password.NewValidator()
 err := validator.Validate(ctx, "mypassword123")
 ```
 
+### db
+
+Database migration helpers using golang-migrate with embedded SQL files.
+
+```go
+import "github.com/travisbale/knowhere/db"
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
+
+// Apply all pending migrations
+err := db.MigrateUp(migrationsFS, "migrations", databaseURL)
+
+// Rollback last migration
+err := db.MigrateDown(migrationsFS, "migrations", databaseURL)
+
+// Get current migration version
+version, dirty, err := db.MigrateVersion(migrationsFS, "migrations", databaseURL)
+```
+
+### db/postgres
+
+Generic PostgreSQL connection pool wrapper with tenant context support for Row-Level Security.
+
+```go
+import (
+    "github.com/travisbale/knowhere/db/postgres"
+    "myapp/internal/db/postgres/internal/sqlc"
+)
+
+// Define app-specific DB type alias
+type DB = postgres.DB[*sqlc.Queries]
+
+// Create connection pool
+db, err := postgres.NewDB(ctx, databaseURL, func(d any) *sqlc.Queries {
+    return sqlc.New(d.(sqlc.DBTX))
+}, nil)
+
+// Execute queries with tenant context (sets app.current_tenant_id for RLS)
+err := db.WithTenantContext(ctx, func(q *sqlc.Queries) error {
+    return q.CreateUser(ctx, params)
+})
+
+// Execute queries without tenant context
+err := db.WithTransaction(ctx, func(q *sqlc.Queries) error {
+    return q.GetVerificationToken(ctx, token)
+})
+
+// Execute with explicit tenant ID
+err := db.WithExplicitTenant(ctx, tenantID, func(q *sqlc.Queries) error {
+    return q.UpdateUser(ctx, params)
+})
+```
+
 ## Installation
 
 ```bash
