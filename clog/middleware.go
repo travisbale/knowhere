@@ -8,15 +8,12 @@ import (
 
 // logger interface for HTTP request logging (matches *slog.Logger)
 type logger interface {
-	InfoContext(ctx context.Context, msg string, args ...any)
-	WarnContext(ctx context.Context, msg string, args ...any)
 	ErrorContext(ctx context.Context, msg string, args ...any)
 }
 
 // HTTP event constants for request logging
 const (
-	RequestCompleted = "request_completed"
-	RequestFailed    = "request_failed"
+	RequestFailed = "request_failed"
 )
 
 // Middleware returns middleware that logs HTTP requests with structured fields and context enrichment
@@ -44,16 +41,9 @@ func Middleware(logger logger) func(http.Handler) http.Handler {
 				"duration_ms", duration,
 			}
 
-			// Log at appropriate level based on status code
+			// Only log server errors - proxy handles access logging
 			if statusCode >= 500 {
-				// Server errors - log as ERROR
 				logger.ErrorContext(r.Context(), RequestFailed, fields...)
-			} else if statusCode >= 400 {
-				// Client errors - log as WARN
-				logger.WarnContext(r.Context(), RequestCompleted, fields...)
-			} else {
-				// Success - log as INFO
-				logger.InfoContext(r.Context(), RequestCompleted, fields...)
 			}
 		})
 	}
