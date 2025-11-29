@@ -25,7 +25,7 @@ var ErrNoTenantInContext = errors.New("no tenant ID found in context")
 // WithActor adds both actor ID and tenant ID to the context
 // Used by JWT middleware to propagate authenticated identity to handlers and database layer
 // The actor is the authenticated user performing the action
-func WithActor(ctx context.Context, actorID, tenantID uuid.UUID) context.Context {
+func WithActor(ctx context.Context, tenantID, actorID uuid.UUID) context.Context {
 	ctx = context.WithValue(ctx, ActorIDKey, actorID)
 	ctx = context.WithValue(ctx, TenantIDKey, tenantID)
 	return ctx

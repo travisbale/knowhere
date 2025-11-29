@@ -59,7 +59,7 @@ func (m *HTTPMiddleware) Authenticate(next http.Handler) http.Handler {
 
 		// Add identity context for downstream RLS enforcement
 		ctx := context.WithValue(r.Context(), claimsContextKey, claims)
-		ctx = identity.WithActor(ctx, claims.UserID, claims.TenantID)
+		ctx = identity.WithActor(ctx, claims.TenantID, claims.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
