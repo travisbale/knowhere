@@ -2,6 +2,8 @@
 
 Shared Go libraries for the microservices platform.
 
+Named after [Knowhere](https://en.wikipedia.org/wiki/Knowhere), home of the Collector’s archive of rare artifacts. This repository stores the shared packages and domain primitives used across all services.
+
 ## Packages
 
 ### identity
@@ -12,7 +14,7 @@ Context helpers for propagating tenant and actor identity through request contex
 import "github.com/travisbale/knowhere/identity"
 
 // Set identity in context
-ctx = identity.WithActor(ctx, actorID, tenantID)
+ctx = identity.WithActor(ctx, tenantID, actorID)
 
 // Retrieve identity from context
 tenantID, err := identity.GetTenant(ctx)
@@ -77,8 +79,8 @@ hasher := argon2.NewHasher(&argon2.Config{
     Parallelism: 4,
 })
 
-hash, err := hasher.HashPassword("mysecretpassword")
-err = hasher.VerifyPassword("mysecretpassword", hash)
+hash, err := hasher.Hash("mysecretpassword")
+err = hasher.Verify("mysecretpassword", hash)
 ```
 
 ### crypto/aes
@@ -118,41 +120,6 @@ import "github.com/travisbale/knowhere/crypto/password"
 
 validator := password.NewValidator()
 err := validator.Validate(ctx, "mypassword123")
-```
-
-### db/postgres
-
-PostgreSQL connection pool with multi-tenant transaction support and migration utilities.
-
-```go
-import "github.com/travisbale/knowhere/db/postgres"
-
-// Create connection pool
-db, err := postgres.NewDB(ctx, databaseURL)
-defer db.Close()
-
-// Or with custom configuration
-cfg := postgres.DefaultConfig()
-cfg.MaxConns = 50
-db, err := postgres.NewDBWithConfig(ctx, databaseURL, cfg)
-
-// Execute within tenant-scoped transaction (sets RLS context)
-err = db.WithTenantContext(ctx, func(tx pgx.Tx) error {
-    _, err := tx.Exec(ctx, "INSERT INTO users ...")
-    return err
-})
-
-// Execute without tenant context (for pre-auth operations)
-err = db.WithTransaction(ctx, func(tx pgx.Tx) error {
-    _, err := tx.Exec(ctx, "SELECT * FROM verification_tokens ...")
-    return err
-})
-
-// Run migrations (pass your embedded migrations FS)
-//go:embed migrations/*.sql
-var migrationsFS embed.FS
-
-err = postgres.MigrateUp(databaseURL, migrationsFS, "migrations")
 ```
 
 ## Installation
