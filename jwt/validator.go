@@ -23,14 +23,18 @@ type Validator struct {
 	publicKey *rsa.PublicKey
 }
 
-// NewValidator creates a new JWT validator with the provided RSA public key
+// NewValidator creates a new JWT validator from a public key file
 func NewValidator(publicKeyPath string) (*Validator, error) {
-	publicKeyFile, err := os.ReadFile(publicKeyPath)
+	publicKeyPEM, err := os.ReadFile(publicKeyPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read public key file: %w", err)
 	}
+	return NewValidatorFromPEM(publicKeyPEM)
+}
 
-	publicKey, err := jwt.ParseRSAPublicKeyFromPEM(publicKeyFile)
+// NewValidatorFromPEM creates a new JWT validator from PEM-encoded public key bytes
+func NewValidatorFromPEM(publicKeyPEM []byte) (*Validator, error) {
+	publicKey, err := jwt.ParseRSAPublicKeyFromPEM(publicKeyPEM)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse public key: %w", err)
 	}
