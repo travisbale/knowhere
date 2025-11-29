@@ -173,8 +173,8 @@ func TestVerify_InvalidHashFormat(t *testing.T) {
 		"",
 		"notahash",
 		"$invalid$format",
-		"$argon2id$v=19$m=65536",                   // Too few parts
-		"$wrong$v=19$m=65536,t=1,p=4$salt$hash",    // Wrong algorithm
+		"$argon2id$v=19$m=65536",                // Too few parts
+		"$wrong$v=19$m=65536,t=1,p=4$salt$hash", // Wrong algorithm
 		"$argon2id$v=99$m=65536,t=1,p=4$salt$hash", // Wrong version
 		"$argon2id$v=19$invalid$salt$hash",         // Invalid parameters
 		"$argon2id$v=19$m=65536,t=1,p=4$!!!$hash",  // Invalid base64 salt
