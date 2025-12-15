@@ -48,7 +48,7 @@ func NewDB[Q any](ctx context.Context, databaseURL string, newQ func(any) Q, cfg
 
 	poolConfig, err := pgxpool.ParseConfig(databaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse database URL: %w", err)
+		return nil, fmt.Errorf("parsing database URL %s: %w", databaseURL, err)
 	}
 
 	poolConfig.MaxConns = cfg.MaxConns
@@ -60,13 +60,13 @@ func NewDB[Q any](ctx context.Context, databaseURL string, newQ func(any) Q, cfg
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create connection pool: %w", err)
+		return nil, fmt.Errorf("creating database connection: %w", err)
 	}
 
 	// Verify connection
 	if err := pool.Ping(ctx); err != nil {
 		pool.Close()
-		return nil, fmt.Errorf("failed to ping database: %w", err)
+		return nil, fmt.Errorf("pinging database: %w", err)
 	}
 
 	return &DB[Q]{pool: pool, newQ: newQ}, nil
@@ -95,7 +95,21 @@ func (d *DB[Q]) Pool() *pgxpool.Pool {
 // WithTransaction executes a function within a database transaction.
 // Use for operations that don't require tenant scoping.
 func (d *DB[Q]) WithTransaction(ctx context.Context, fn func(Q) error) error {
-	return d.withTenantTransaction(ctx, "", fn)
+	tx, err := d.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer func() {
+		if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
+			slog.Error("failed to rollback transaction", "error", err)
+		}
+	}()
+
+	if err := fn(d.newQ(tx)); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
 }
 
 // WithTenantContext executes a function within a tenant-scoped transaction.
@@ -105,10 +119,7 @@ func (d *DB[Q]) WithTenantContext(ctx context.Context, fn func(Q) error) error {
 	if err != nil {
 		return err
 	}
-	return d.withTenantTransaction(ctx, tenantID.String(), fn)
-}
 
-func (d *DB[Q]) withTenantTransaction(ctx context.Context, tenantID string, fn func(Q) error) error {
 	tx, err := d.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
