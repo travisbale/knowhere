@@ -56,19 +56,19 @@ func GetTenant(ctx context.Context) (uuid.UUID, error) {
 	return tenantID, nil
 }
 
-// GetActorAndTenant retrieves both actor ID and tenant ID from the context
-func GetActorAndTenant(ctx context.Context) (actorID, tenantID uuid.UUID, err error) {
-	actorID, err = GetActor(ctx)
-	if err != nil {
-		return uuid.Nil, uuid.Nil, err
-	}
-
+// GetTenantAndActor retrieves both tenant ID and actor ID from the context
+func GetTenantAndActor(ctx context.Context) (tenantID, actorID uuid.UUID, err error) {
 	tenantID, err = GetTenant(ctx)
 	if err != nil {
 		return uuid.Nil, uuid.Nil, err
 	}
 
-	return actorID, tenantID, nil
+	actorID, err = GetActor(ctx)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, err
+	}
+
+	return tenantID, actorID, nil
 }
 
 // WithIPAddress adds the client IP address to the context
