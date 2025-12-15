@@ -15,10 +15,6 @@ type Cipher struct {
 
 // NewCipher creates a new AES-256-GCM cipher with the provided key
 func NewCipher(key []byte) (*Cipher, error) {
-	if len(key) != 32 {
-		return nil, fmt.Errorf("key must be exactly 32 bytes (256 bits), got %d bytes", len(key))
-	}
-
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cipher: %w", err)
