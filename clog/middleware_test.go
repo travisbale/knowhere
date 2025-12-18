@@ -23,7 +23,7 @@ func parseLogEntry(buf *bytes.Buffer) map[string]any {
 	return logEntry
 }
 
-func TestLoggingMiddleware_Success(t *testing.T) {
+func TestLoggingMiddleware_Success_NoLog(t *testing.T) {
 	buf, logger := setupTestLogger()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -36,29 +36,13 @@ func TestLoggingMiddleware_Success(t *testing.T) {
 	rec := httptest.NewRecorder()
 	wrappedHandler.ServeHTTP(rec, req)
 
-	logEntry := parseLogEntry(buf)
-
-	if logEntry["msg"] != RequestCompleted {
-		t.Errorf("expected msg to be '%s', got %v", RequestCompleted, logEntry["msg"])
-	}
-	if logEntry["level"] != "INFO" {
-		t.Errorf("expected level to be 'INFO', got %v", logEntry["level"])
-	}
-	if logEntry["http_method"] != "GET" {
-		t.Errorf("expected http_method to be 'GET', got %v", logEntry["http_method"])
-	}
-	if logEntry["http_path"] != "/test" {
-		t.Errorf("expected http_path to be '/test', got %v", logEntry["http_path"])
-	}
-	if logEntry["http_status"] != float64(200) {
-		t.Errorf("expected http_status to be 200, got %v", logEntry["http_status"])
-	}
-	if _, exists := logEntry["duration_ms"]; !exists {
-		t.Error("expected duration_ms to be present")
+	// Should not log successful requests (proxy handles this)
+	if buf.Len() > 0 {
+		t.Error("expected no log output for successful request")
 	}
 }
 
-func TestLoggingMiddleware_ClientError(t *testing.T) {
+func TestLoggingMiddleware_ClientError_NoLog(t *testing.T) {
 	buf, logger := setupTestLogger()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -70,13 +54,9 @@ func TestLoggingMiddleware_ClientError(t *testing.T) {
 	rec := httptest.NewRecorder()
 	wrappedHandler.ServeHTTP(rec, req)
 
-	logEntry := parseLogEntry(buf)
-
-	if logEntry["level"] != "WARN" {
-		t.Errorf("expected level to be 'WARN', got %v", logEntry["level"])
-	}
-	if logEntry["http_status"] != float64(404) {
-		t.Errorf("expected http_status to be 404, got %v", logEntry["http_status"])
+	// Should not log client errors (proxy handles this)
+	if buf.Len() > 0 {
+		t.Error("expected no log output for client error")
 	}
 }
 
@@ -103,9 +83,18 @@ func TestLoggingMiddleware_ServerError(t *testing.T) {
 	if logEntry["http_status"] != float64(500) {
 		t.Errorf("expected http_status to be 500, got %v", logEntry["http_status"])
 	}
+	if logEntry["http_method"] != "POST" {
+		t.Errorf("expected http_method to be 'POST', got %v", logEntry["http_method"])
+	}
+	if logEntry["http_path"] != "/error" {
+		t.Errorf("expected http_path to be '/error', got %v", logEntry["http_path"])
+	}
+	if _, exists := logEntry["duration_ms"]; !exists {
+		t.Error("expected duration_ms to be present")
+	}
 }
 
-func TestLoggingMiddleware_ImplicitStatusOK(t *testing.T) {
+func TestLoggingMiddleware_ImplicitStatusOK_NoLog(t *testing.T) {
 	buf, logger := setupTestLogger()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -117,12 +106,30 @@ func TestLoggingMiddleware_ImplicitStatusOK(t *testing.T) {
 	rec := httptest.NewRecorder()
 	wrappedHandler.ServeHTTP(rec, req)
 
+	// Should not log implicit 200 OK (proxy handles this)
+	if buf.Len() > 0 {
+		t.Error("expected no log output for implicit 200 OK")
+	}
+}
+
+func TestLoggingMiddleware_ServiceUnavailable(t *testing.T) {
+	buf, logger := setupTestLogger()
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	})
+
+	wrappedHandler := Middleware(logger)(handler)
+	req := httptest.NewRequest("GET", "/unavailable", nil)
+	rec := httptest.NewRecorder()
+	wrappedHandler.ServeHTTP(rec, req)
+
 	logEntry := parseLogEntry(buf)
 
-	if logEntry["http_status"] != float64(200) {
-		t.Errorf("expected http_status to be 200, got %v", logEntry["http_status"])
+	if logEntry["level"] != "ERROR" {
+		t.Errorf("expected level to be 'ERROR', got %v", logEntry["level"])
 	}
-	if logEntry["level"] != "INFO" {
-		t.Errorf("expected level to be 'INFO', got %v", logEntry["level"])
+	if logEntry["http_status"] != float64(503) {
+		t.Errorf("expected http_status to be 503, got %v", logEntry["http_status"])
 	}
 }

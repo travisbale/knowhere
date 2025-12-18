@@ -122,8 +122,10 @@ func TestInvalidKeyLength(t *testing.T) {
 		name      string
 		keyLength int
 	}{
-		{"16 bytes", 16},
-		{"24 bytes", 24},
+		{"15 bytes", 15},
+		{"17 bytes", 17},
+		{"23 bytes", 23},
+		{"25 bytes", 25},
 		{"31 bytes", 31},
 		{"33 bytes", 33},
 		{"0 bytes", 0},
@@ -135,11 +137,41 @@ func TestInvalidKeyLength(t *testing.T) {
 
 			_, err := NewCipher(key)
 			if err == nil {
-				t.Error("NewCipher() should fail with invalid key length")
+				t.Fatal("NewCipher() should fail with invalid key length")
 			}
 
-			if !strings.Contains(err.Error(), "key must be exactly 32 bytes") {
-				t.Errorf("NewCipher() error = %v, want 'key must be exactly 32 bytes'", err)
+			if !strings.Contains(err.Error(), "invalid key size") {
+				t.Errorf("NewCipher() error = %v, want error containing 'invalid key size'", err)
+			}
+		})
+	}
+}
+
+func TestValidKeyLengths(t *testing.T) {
+	tests := []struct {
+		name      string
+		keyLength int
+	}{
+		{"16 bytes (AES-128)", 16},
+		{"24 bytes (AES-192)", 24},
+		{"32 bytes (AES-256)", 32},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			key := make([]byte, tt.keyLength)
+			// Fill with non-zero data
+			for i := range key {
+				key[i] = byte(i)
+			}
+
+			cipher, err := NewCipher(key)
+			if err != nil {
+				t.Fatalf("NewCipher() should succeed with valid key length, got error: %v", err)
+			}
+
+			if cipher == nil {
+				t.Fatal("NewCipher() returned nil cipher")
 			}
 		})
 	}
