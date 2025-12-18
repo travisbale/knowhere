@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/travisbale/knowhere/identity"
 )
 
 // ErrorResponse represents a generic error response
@@ -87,4 +88,14 @@ func ParseUUID(s string) uuid.UUID {
 // ParseDate parses a date string in YYYY-MM-DD format
 func ParseDate(dateStr string) (time.Time, error) {
 	return time.Parse("2006-01-02", dateStr)
+}
+
+// GetAuthenticatedActorID extracts the actor ID from context, returns false if unauthorized
+func GetAuthenticatedActorID(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
+	actorID, err := identity.GetActor(r.Context())
+	if err != nil {
+		RespondError(w, http.StatusUnauthorized, "Unauthorized", nil)
+		return uuid.Nil, false
+	}
+	return actorID, true
 }
