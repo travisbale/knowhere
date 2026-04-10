@@ -32,10 +32,10 @@ func NewHTTPMiddleware(validator validator) *HTTPMiddleware {
 	}
 }
 
-// Authenticate is HTTP middleware that validates JWT tokens and authenticates users
-// Extracts user ID and tenant ID from token and adds to request context for downstream handlers
-func (m *HTTPMiddleware) Authenticate(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+// Authenticate wraps a handler with JWT authentication.
+// Extracts user ID and tenant ID from token and adds to request context.
+func (m *HTTPMiddleware) Authenticate(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
 			http.Error(w, `{"error":"missing authorization header"}`, http.StatusUnauthorized)
@@ -49,9 +49,7 @@ func (m *HTTPMiddleware) Authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		tokenString := parts[1]
-
-		claims, err := m.validator.ValidateToken(tokenString)
+		claims, err := m.validator.ValidateToken(parts[1])
 		if err != nil {
 			http.Error(w, `{"error":"invalid or expired token"}`, http.StatusUnauthorized)
 			return
@@ -61,48 +59,30 @@ func (m *HTTPMiddleware) Authenticate(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), claimsContextKey, claims)
 		ctx = identity.WithActor(ctx, claims.TenantID, claims.UserID)
 		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+	}
 }
 
 // Scope represents a system permission identifier used in JWT tokens and authorization
 type Scope string
 
-// RequireScope returns middleware that authenticates users and verifies they have all required scopes
-// Accepts one or more scopes that the user must possess to access the endpoint
-func (m *HTTPMiddleware) RequireScope(scopes ...Scope) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		// Then check scopes (authorization)
-		checkScopes := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			claims, err := getClaimsFromContext(r.Context())
-			if err != nil {
-				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+// RequireScope wraps a handler with JWT authentication and scope verification.
+func (m *HTTPMiddleware) RequireScope(scope Scope, next http.HandlerFunc) http.HandlerFunc {
+	return m.Authenticate(func(w http.ResponseWriter, r *http.Request) {
+		claims, err := getClaimsFromContext(r.Context())
+		if err != nil {
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+
+		for _, s := range claims.Scopes {
+			if s == scope {
+				next.ServeHTTP(w, r)
 				return
 			}
+		}
 
-			userScopes := make(map[Scope]bool)
-			for _, scope := range claims.Scopes {
-				userScopes[scope] = true
-			}
-
-			// Check if user has all required scopes
-			var missingScopes []Scope
-			for _, required := range scopes {
-				if !userScopes[required] {
-					missingScopes = append(missingScopes, required)
-				}
-			}
-
-			if len(missingScopes) > 0 {
-				http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
-
-		// First authenticate, then check scopes
-		return m.Authenticate(checkScopes)
-	}
+		http.Error(w, `{"error":"insufficient permissions"}`, http.StatusForbidden)
+	})
 }
 
 // GetJWTClaims extracts the full JWT claims from the request context
