@@ -58,7 +58,7 @@ func DecodeJSON(r *http.Request, v any) error {
 
 // Validator is an interface for types that can validate themselves
 type Validator interface {
-	Validate(ctx context.Context) error
+	Validate() error
 }
 
 // DecodeAndValidateJSON decodes and validates JSON, returns false if error response was sent
@@ -68,7 +68,7 @@ func DecodeAndValidateJSON(w http.ResponseWriter, r *http.Request, req Validator
 		return false
 	}
 
-	if err := req.Validate(r.Context()); err != nil {
+	if err := req.Validate(); err != nil {
 		RespondError(w, http.StatusBadRequest, err.Error(), nil)
 		return false
 	}
