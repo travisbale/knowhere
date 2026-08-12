@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          # Minor only: patch releases are picked up automatically.
+          go-version: '1.25'
+          cache: true
+
+      - name: Check formatting
+        run: |
+          make fmt
+          if ! git diff --exit-code; then
+            echo "Code is not formatted. Run 'make fmt' and commit the changes."
+            exit 1
+          fi
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # make lint runs golangci-lint via Docker, so CI and local use the same version.
+      - name: Run golangci-lint
+        run: make lint
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    # A service container rather than the compose file: CI needs one database for one job,
+    # and compose is there so a developer can get the same one locally.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: knowhere
+          POSTGRES_PASSWORD: knowhere
+          POSTGRES_DB: knowhere_test
+        ports:
+          - 5434:5432
+        options: >-
+          --health-cmd "pg_isready -U knowhere -d knowhere_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: '1.25'
+          cache: true
+
+      # test-db rather than test: the transaction tests skip when this is unset, and a
+      # suite that silently skips its most important cases is worse than no suite.
+      - name: Run tests
+        run: make test-db

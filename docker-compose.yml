@@ -1,0 +1,21 @@
+# Postgres for the db/postgres transaction tests, which need real commit and rollback
+# semantics and cannot be faked. Everything else in this repo is a pure unit test.
+name: knowhere-test
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: knowhere-postgres-test
+    ports:
+      # 5434, so this can run alongside a heimdall test db on 5432 and a scorecard one
+      # on 5433 without either of them noticing.
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: knowhere
+      POSTGRES_PASSWORD: knowhere
+      POSTGRES_DB: knowhere_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowhere -d knowhere_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
