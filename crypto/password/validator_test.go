@@ -156,7 +156,7 @@ func TestValidator_Validate_Breached(t *testing.T) {
 		mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Return the hash suffix with a count
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(suffix + ":12345\n"))
+			_, _ = w.Write([]byte(suffix + ":12345\n"))
 		}))
 		defer mockServer.Close()
 

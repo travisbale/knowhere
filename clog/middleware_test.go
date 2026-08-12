@@ -19,7 +19,7 @@ func setupTestLogger() (*bytes.Buffer, logger) {
 // parseLogEntry parses the JSON log output from the buffer
 func parseLogEntry(buf *bytes.Buffer) map[string]any {
 	var logEntry map[string]any
-	json.Unmarshal(buf.Bytes(), &logEntry)
+	_ = json.Unmarshal(buf.Bytes(), &logEntry)
 	return logEntry
 }
 
@@ -28,7 +28,7 @@ func TestLoggingMiddleware_Success_NoLog(t *testing.T) {
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("success"))
+		_, _ = w.Write([]byte("success"))
 	})
 
 	wrappedHandler := Middleware(logger)(handler)
@@ -98,7 +98,7 @@ func TestLoggingMiddleware_ImplicitStatusOK_NoLog(t *testing.T) {
 	buf, logger := setupTestLogger()
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 
 	wrappedHandler := Middleware(logger)(handler)

@@ -26,13 +26,13 @@ func generateTestKeys(t *testing.T) (privateKeyPath, publicKeyPath string) {
 	if err != nil {
 		t.Fatalf("failed to create temp private key file: %v", err)
 	}
-	defer privateKeyFile.Close()
+	defer func() { _ = privateKeyFile.Close() }()
 
 	publicKeyFile, err := os.CreateTemp("", "jwt_public_*.pem")
 	if err != nil {
 		t.Fatalf("failed to create temp public key file: %v", err)
 	}
-	defer publicKeyFile.Close()
+	defer func() { _ = publicKeyFile.Close() }()
 
 	// Encode private key
 	privateKeyBytes := x509.MarshalPKCS1PrivateKey(privateKey)
@@ -61,8 +61,8 @@ func generateTestKeys(t *testing.T) (privateKeyPath, publicKeyPath string) {
 }
 
 func cleanupKeys(privateKeyPath, publicKeyPath string) {
-	os.Remove(privateKeyPath)
-	os.Remove(publicKeyPath)
+	_ = os.Remove(privateKeyPath)
+	_ = os.Remove(publicKeyPath)
 }
 
 func createTestService(t *testing.T) (*Service, string, string) {
