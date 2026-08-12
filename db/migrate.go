@@ -3,6 +3,7 @@ package db
 import (
 	"embed"
 	"fmt"
+	"log/slog"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -30,7 +31,11 @@ func MigrateUp(fs embed.FS, dir string, databaseURL string) error {
 	if err != nil {
 		return err
 	}
-	defer migrator.Close()
+	defer func() {
+		if srcErr, dbErr := migrator.Close(); srcErr != nil || dbErr != nil {
+			slog.Error("failed to close migrator", "source", srcErr, "database", dbErr)
+		}
+	}()
 
 	if err := migrator.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("failed to apply migrations: %w", err)
@@ -44,7 +49,11 @@ func MigrateDown(fs embed.FS, dir string, databaseURL string) error {
 	if err != nil {
 		return err
 	}
-	defer migrator.Close()
+	defer func() {
+		if srcErr, dbErr := migrator.Close(); srcErr != nil || dbErr != nil {
+			slog.Error("failed to close migrator", "source", srcErr, "database", dbErr)
+		}
+	}()
 
 	if err := migrator.Steps(-1); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("failed to rollback migration: %w", err)
@@ -58,7 +67,11 @@ func MigrateVersion(fs embed.FS, dir string, databaseURL string) (version uint, 
 	if err != nil {
 		return 0, false, err
 	}
-	defer migrator.Close()
+	defer func() {
+		if srcErr, dbErr := migrator.Close(); srcErr != nil || dbErr != nil {
+			slog.Error("failed to close migrator", "source", srcErr, "database", dbErr)
+		}
+	}()
 
 	version, dirty, err = migrator.Version()
 	if err != nil && err != migrate.ErrNilVersion {
