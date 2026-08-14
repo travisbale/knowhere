@@ -18,8 +18,12 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          # Minor only: patch releases are picked up automatically.
+          # Minor only, so a patch release is picked up without editing this. check-latest
+          # because setup-go otherwise stops at whatever patch the runner image already
+          # ships, which trails a Go security release by days — that is how a stdlib CVE
+          # fixed in 1.26.6 kept the scan red on a runner holding 1.26.5.
           go-version: '1.25'
+          check-latest: true
           cache: true
 
       - name: Check formatting
@@ -52,6 +56,7 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: '1.25'
+          check-latest: true
           cache: true
 
       - name: Build
@@ -89,6 +94,7 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: '1.25'
+          check-latest: true
           cache: true
 
       # test-db rather than test: the transaction tests skip when this is unset, and a
