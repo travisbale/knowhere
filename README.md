@@ -21,6 +21,24 @@ tenantID, err := identity.GetTenant(ctx)
 actorID, err := identity.GetActor(ctx)
 ```
 
+HTTP middleware populates the request ID, client IP and user agent. `ClientIP` reads
+`X-Forwarded-For` only in trusted-proxy mode, so an untrusted caller cannot spoof its own
+address:
+
+```go
+handler = identity.RequestID(handler)
+handler = identity.ClientIP(trustedProxyMode)(handler)
+handler = identity.UserAgent(handler)
+```
+
+`RequireProxySecret` rejects requests that did not arrive through the edge that injects
+`X-Proxy-Secret`, which keeps a directly-reachable origin from being hit around it. Exempt
+the health check, which probes hit directly. An empty secret disables the check:
+
+```go
+handler = identity.RequireProxySecret(secret, "/healthz")(handler)
+```
+
 ### jwt
 
 JWT token issuance, validation, and HTTP middleware for authentication.
@@ -62,6 +80,22 @@ import "github.com/travisbale/knowhere/clog"
 
 // Add logging middleware to router
 router.Use(clog.Middleware(slog.Default()))
+```
+
+### api
+
+JSON response, decoding and validation helpers for HTTP handlers.
+
+```go
+import "github.com/travisbale/knowhere/api"
+
+api.RespondJSON(w, http.StatusOK, user)
+api.RespondError(w, http.StatusNotFound, "User not found", nil)
+
+// Decodes, rejects unknown fields, and runs the request's own Validate
+if !api.DecodeAndValidateJSON(w, r, &req) {
+    return
+}
 ```
 
 ### crypto/argon2
@@ -111,17 +145,6 @@ tok, err := token.Generate(32)
 hashed := token.Hash(tok)
 ```
 
-### crypto/password
-
-Password validation with breach checking (Have I Been Pwned).
-
-```go
-import "github.com/travisbale/knowhere/crypto/password"
-
-validator := password.NewValidator()
-err := validator.Validate(ctx, "mypassword123")
-```
-
 ### db
 
 Database migration helpers using golang-migrate with embedded SQL files.
@@ -165,16 +188,16 @@ err := db.WithTenantContext(ctx, func(q *sqlc.Queries) error {
     return q.CreateUser(ctx, params)
 })
 
-// Execute queries without tenant context
+// Execute queries without tenant context, for lookups that resolve the tenant
 err := db.WithTransaction(ctx, func(q *sqlc.Queries) error {
     return q.GetVerificationToken(ctx, token)
 })
-
-// Execute with explicit tenant ID
-err := db.WithExplicitTenant(ctx, tenantID, func(q *sqlc.Queries) error {
-    return q.UpdateUser(ctx, params)
-})
 ```
+
+One call is one transaction, and that is the whole transaction API. Writes that must be
+atomic together belong in a single closure in the caller's own repository layer; where two
+paths need the same writes, extract a helper taking the queries type and let each closure
+compose it.
 
 ## Installation
 
