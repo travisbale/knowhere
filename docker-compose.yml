@@ -7,8 +7,8 @@ services:
     image: postgres:16-alpine
     container_name: knowhere-postgres-test
     ports:
-      # 5434, so this can run alongside a heimdall test db on 5432 and a scorecard one
-      # on 5433 without either of them noticing.
+      # Off the default 5432, which is usually already taken — by a local install, or by
+      # another project's test database. Override TEST_DATABASE_URL if 5434 is busy too.
       - "5434:5432"
     environment:
       POSTGRES_USER: knowhere
