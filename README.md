@@ -147,7 +147,9 @@ hashed := token.Hash(tok)
 
 ### db
 
-Database migration helpers using golang-migrate with embedded SQL files.
+Database migration helpers using golang-migrate with embedded SQL files. Migrations run
+through pgx, so a caller passes the same postgres URL it opens a pool with and imports no
+driver of its own.
 
 ```go
 import "github.com/travisbale/knowhere/db"
