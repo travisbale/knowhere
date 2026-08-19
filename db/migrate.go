@@ -4,20 +4,32 @@ import (
 	"embed"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5" // registers the "pgx5" driver golang-migrate opens from the URL scheme
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
+// migrateURL points a postgres URL at the pgx driver, which golang-migrate registers under
+// its own scheme. Callers pass the same URL they open a pool with.
+func migrateURL(databaseURL string) string {
+	for _, scheme := range []string{"postgresql://", "postgres://"} {
+		if rest, ok := strings.CutPrefix(databaseURL, scheme); ok {
+			return "pgx5://" + rest
+		}
+	}
+	return databaseURL
+}
+
 // newMigrator creates a migrate instance for embedded SQL migrations.
-// Callers must import the appropriate database driver for their URL scheme.
 func newMigrator(fs embed.FS, dir string, databaseURL string) (*migrate.Migrate, error) {
 	sourceDriver, err := iofs.New(fs, dir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create iofs driver: %w", err)
 	}
 
-	migrator, err := migrate.NewWithSourceInstance("iofs", sourceDriver, databaseURL)
+	migrator, err := migrate.NewWithSourceInstance("iofs", sourceDriver, migrateURL(databaseURL))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create migrate instance: %w", err)
 	}
