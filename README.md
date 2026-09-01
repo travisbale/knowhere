@@ -185,6 +185,12 @@ db, err := postgres.NewDB(ctx, databaseURL, func(d any) *sqlc.Queries {
     return sqlc.New(d.(sqlc.DBTX))
 }, nil)
 
+// Building the pool does not reach the database. Ask when reachability matters — from a
+// readiness endpoint, or here if a process would rather not start against a bad address.
+if err := db.Health(ctx); err != nil {
+    return fmt.Errorf("database unreachable: %w", err)
+}
+
 // Execute queries with tenant context (sets app.current_tenant_id for RLS)
 err := db.WithTenantContext(ctx, func(q *sqlc.Queries) error {
     return q.CreateUser(ctx, params)

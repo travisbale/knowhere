@@ -41,6 +41,10 @@ func DefaultConfig() *Config {
 
 // NewDB creates a new database connection pool with the given queries constructor.
 // The newQ function should wrap sqlc.New, e.g.: func(d any) *sqlc.Queries { return sqlc.New(d.(sqlc.DBTX)) }
+//
+// Constructing a pool does not wait for the database. ctx governs the pool's background
+// connection warm-up, so give it one that lives as long as the pool, not a startup timeout.
+// A caller that needs the database to be reachable asks Health, as a readiness probe does.
 func NewDB[Q any](ctx context.Context, databaseURL string, newQ func(any) Q, cfg *Config) (*DB[Q], error) {
 	if cfg == nil {
 		cfg = DefaultConfig()
@@ -61,12 +65,6 @@ func NewDB[Q any](ctx context.Context, databaseURL string, newQ func(any) Q, cfg
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		return nil, fmt.Errorf("creating database connection: %w", err)
-	}
-
-	// Verify connection
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("pinging database: %w", err)
 	}
 
 	return &DB[Q]{pool: pool, newQ: newQ}, nil

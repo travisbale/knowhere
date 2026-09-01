@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -38,7 +39,9 @@ func testDB(t *testing.T) (*DB[*testQueries], string) {
 	}
 	db, err := NewDB(context.Background(), url, newTestQueries, nil)
 	if err != nil {
-		t.Skipf("cannot reach %s (%v)", dbURLEnv, err)
+		// Building a pool no longer reaches the database, so this is a URL that will not parse:
+		// a broken setup, which skipping would report as a suite that ran and passed.
+		t.Fatalf("building a pool from %s: %v", dbURLEnv, err)
 	}
 	t.Cleanup(db.Close)
 
@@ -203,5 +206,22 @@ func TestQueries_WritesOutsideAnyTransaction(t *testing.T) {
 	}
 	if n := rowCount(t, db, table); n != 1 {
 		t.Errorf("want the write visible immediately, got %d", n)
+	}
+}
+
+// Unlike the rest of this file, no database on purpose: nothing listens on this address, so a
+// pool that dialled while being built would fail here rather than wait.
+func TestNewDBDoesNotDial(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	db, err := NewDB(ctx, "postgres://u:p@127.0.0.1:1/absent", newTestQueries, nil)
+	if err != nil {
+		t.Fatalf("building a pool reached the database: %v", err)
+	}
+	defer db.Close()
+
+	if err := db.Health(ctx); err == nil {
+		t.Fatal("Health answered for a database that is not there")
 	}
 }
